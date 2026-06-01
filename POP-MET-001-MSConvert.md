@@ -1,22 +1,20 @@
 # POP-MET-001
 
 Título: Conversão de dados RAW para mzML
-Código: 001
-Área: MET
-Aplicação: Lipidômica, Metabolômica, Proteômica
+
 Software: MSConvert
+
 Elaborado por: Tainá Schons
+
 Data de criação:: 01/06/2026
+
 Última atualização:: 01/06/2026
+
 Nível: Básico
-Status: Em elaboração
-Tags: Conversão, Drylab, Metabolômica, Proteômica
 
 ## Objetivo
 
 <aside>
-💡
-
 Descrever o procedimento para converter arquivos brutos de espectrometria de massas (.raw) para o formato aberto mzML utilizando o software MSConvert, garantindo compatibilidade com plataformas de processamento de dados metabolômicos, lipidômicos e proteômicos, como MZmine, MS-DIAL, GNPS e SIRIUS.
 
 </aside>
@@ -50,7 +48,7 @@ Descrever o procedimento para converter arquivos brutos de espectrometria de mas
 
 Abrir o software.
 
-![image.png](image.png)
+
 
 ### Passo 2 - Selecionar os arquivos
 
@@ -60,7 +58,7 @@ Selecionar os arquivos RAW desejados.
 - Navegar até a pasta contendo os arquivos
 - Selecionar os arquivos a serem convertidos
 
-![image.png](image%201.png)
+
 
 ### Passo 3 – Definir diretório de saída
 
@@ -91,12 +89,10 @@ MS Levels: 1-
 
 Demais opções podem ser mantidas como estão.
 
-![image.png](image%202.png)
+
 
 <aside>
-⚠️
-
- Dados adquiridos no modo profile (contínuo) devem ser centroidizados durante a conversão para mzML. Recomenda-se o uso do filtro *Peak Picking (Vendor)*, que aplica o algoritmo de centroidização fornecido pelo fabricante do instrumento. Após a conversão, os arquivos serão reconhecidos como centroidados pelos softwares de processamento.
+⚠️ Dados adquiridos no modo profile (contínuo) devem ser centroidizados durante a conversão para mzML. Recomenda-se o uso do filtro Peak Picking (Vendor), que aplica o algoritmo de centroidização fornecido pelo fabricante do instrumento. Após a conversão, os arquivos serão reconhecidos como centroidados pelos softwares de processamento.
 
 </aside>
 
