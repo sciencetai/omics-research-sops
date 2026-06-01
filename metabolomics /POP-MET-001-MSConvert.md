@@ -1,145 +1,158 @@
 # POP-MET-001
 
-Título: Conversão de dados RAW para mzML
+**Title:** RAW to mzML Conversion Using MSConvert
 
-Software: MSConvert
+**Code:** POP-MET-001
 
-Elaborado por: Tainá Schons
+**Area:** Metabolomics
 
-Data de criação:: 01/06/2026
+**Software:** MSConvert
 
-Última atualização:: 01/06/2026
+**Prepared by:** Tainá Schons
 
-Nível: Básico
+**Creation Date:** 2026-06-01
 
-## Objetivo
+**Last Updated:** 2026-06-01
 
-<aside>
-Descrever o procedimento para converter arquivos brutos de espectrometria de massas (.raw) para o formato aberto mzML utilizando o software MSConvert, garantindo compatibilidade com plataformas de processamento de dados metabolômicos, lipidômicos e proteômicos, como MZmine, MS-DIAL, GNPS e SIRIUS.
+**Level:** Basic
 
-</aside>
+## Objective
 
-## Fundamentação teórica
-
-> O formato mzML é um padrão aberto desenvolvido pela Human Proteome Organization Proteomics Standards Initiative (HUPO-PSI), amplamente utilizado para o armazenamento e o intercâmbio de dados de espectrometria de massas. A conversão de arquivos proprietários para mzML aumenta a reprodutibilidade, facilita o compartilhamento de dados e permite o uso de diferentes plataformas de processamento e análise.
-> 
-
-## Aplicação:
-
-> Dados adquiridos em instrumentos Waters, Thermo, Agilent, Bruker e SCIEX compatíveis com o ProteoWizard
-> 
-
-## Softwares e Ferramentas necessários
-
-| Software | Versão |
-| --- | --- |
-| ProteoWizard MSConvert |  |
-| Sistema Operacional Windows | 10 ou superior |
-
-## Arquivos de Entrada
-
-- `.raw` (Waters)
-- `.RAW` (Thermo)
-- Outros formatos compatíveis
-
-## Procedimento
-
-### Passo 1 - Abrir o MSConvert
-
-Abrir o software.
-
-
-
-### Passo 2 - Selecionar os arquivos
-
-Selecionar os arquivos RAW desejados.
-
-- Clicar em **Browse**
-- Navegar até a pasta contendo os arquivos
-- Selecionar os arquivos a serem convertidos
-
-
-
-### Passo 3 – Definir diretório de saída
-
-Selecionar a pasta onde os arquivos mzML serão salvos. “Output directory”
-
-### Passo 4 – Configurar formato de saída
-
-Em "Output format":
-
-- Selecionar **mzML**
+Describe the procedure for converting raw mass spectrometry data files (.raw) into the open mzML format using MSConvert, ensuring compatibility with downstream metabolomics, lipidomics, and proteomics data processing platforms such as MZmine, MS-DIAL, GNPS, and SIRIUS.
 
 ---
 
-### Passo 5 – Configurar filtros
+## Background
 
-### Dados centroidados
+The mzML format is an open standard developed by the Human Proteome Organization Proteomics Standards Initiative (HUPO-PSI) for the storage and exchange of mass spectrometry data. Converting vendor-specific files to mzML improves reproducibility, facilitates data sharing, and enables interoperability across different processing and analysis platforms.
 
-Não aplicar filtros adicionais.
+---
 
-### Dados em modo contínuo (profile)
+## Scope
 
-Aplicar:
+This procedure applies to data acquired on Waters, Thermo, Agilent, Bruker, and SCIEX instruments supported by ProteoWizard.
 
-> Peak Picking
-Vendor
+---
+
+## Required Software and Tools
+
+| Software               | Version     |
+| ---------------------- | ----------- |
+| ProteoWizard MSConvert |             |
+| Microsoft Windows      | 10 or later |
+
+---
+
+## Input Files
+
+* `.raw` (Waters)
+* `.RAW` (Thermo)
+* Other ProteoWizard-compatible formats
+
+---
+
+## Procedure
+
+### Step 1 – Open MSConvert
+
+Launch the MSConvert software.
+
+### Step 2 – Select Input Files
+
+Select the RAW files to be converted.
+
+* Click **Browse**
+* Navigate to the folder containing the raw data files
+* Select the files to be converted
+
+### Step 3 – Define the Output Directory
+
+Select the destination folder where the mzML files will be saved using the **Output Directory** field.
+
+### Step 4 – Configure the Output Format
+
+Under **Output Format**:
+
+* Select **mzML**
+
+### Step 5 – Configure Filters
+
+#### Centroided Data
+
+No additional filters are required.
+
+#### Profile Data
+
+Apply the following filter:
+
+```text
+Peak Picking
+Algorithm: Vendor
 MS Levels: 1-
-> 
+```
 
-Demais opções podem ser mantidas como estão.
+All other settings may remain at their default values.
 
+**Important**
 
+Data acquired in profile mode should be centroided during mzML conversion. The recommended approach is to use the **Peak Picking (Vendor)** filter, which applies the manufacturer's native centroiding algorithm. After conversion, the resulting mzML files will be recognized as centroided by most downstream processing software.
 
-<aside>
-⚠️ Dados adquiridos no modo profile (contínuo) devem ser centroidizados durante a conversão para mzML. Recomenda-se o uso do filtro Peak Picking (Vendor), que aplica o algoritmo de centroidização fornecido pelo fabricante do instrumento. Após a conversão, os arquivos serão reconhecidos como centroidados pelos softwares de processamento.
+### Step 6 – Start the Conversion
 
-</aside>
-
-### Passo 6 – Iniciar conversão
-
-Clicar em: “start” e aguardar a conclusão do processamento.
-
-## Controle de Qualidade
-
-Após a conversão verificar:
-
-- Todos os arquivos foram convertidos
-- Nenhum erro foi reportado pelo software
-- O tamanho dos arquivos é compatível com o esperado
-- Os arquivos mzML podem ser abertos no MZmine
+Click **Start** and wait until the conversion process is completed.
 
 ---
 
-## Saídas Esperadas
+## Quality Control
 
-- Arquivos .mzML
+After conversion, verify that:
 
-## Problemas Comuns
-
-| Problema | Possível causa | Solução |
-| --- | --- | --- |
-| Reader Fail | Caracteres especiais no caminho (á, ç, ã) | Mover arquivos para diretório sem caracteres especiais |
-| Arquivo não abre no MZmine | Conversão incompleta | Repetir processo |
-| Arquivo muito pequeno | Configuração incorreta de filtros | Revisar parâmetros |
-|  |  |  |
-
-## Referências
-
-ProteoWizard Documentation - [https://proteowizard.sourceforge.io/](https://proteowizard.sourceforge.io/)
-
-HUPO-PSI mzML Specification - [https://www.psidev.info/mzml](https://www.psidev.info/mzml)
-
-## Observações
-
-- Evitar nomes de pastas contendo caracteres especiais (á, é, í, ó, ú, ç, ã).
-- Manter os arquivos RAW originais sem modificações.
-- Armazenar os arquivos mzML em diretório separado dos arquivos brutos.
+* All files were successfully converted
+* No errors were reported by MSConvert
+* Output file sizes are consistent with expectations
+* The mzML files can be opened successfully in MZmine
 
 ---
 
-## Histórico de Revisões
+## Expected Outputs
 
-| Data | Alteração | Responsável |
-| --- | --- | --- |
-| 01/06/2026 | Elaboração | Tainá Schons |
+* mzML files
+* Centroided spectra when Peak Picking is applied
+* Files compatible with MZmine, MS-DIAL, GNPS, and SIRIUS
+
+---
+
+## Common Issues
+
+| Issue                                | Possible Cause                                         | Solution                                             |
+| ------------------------------------ | ------------------------------------------------------ | ---------------------------------------------------- |
+| Reader Fail error                    | Special characters in the file path (e.g., á, é, ç, ã) | Move files to a directory without special characters |
+| mzML file cannot be opened in MZmine | Incomplete conversion                                  | Repeat the conversion process                        |
+| Output file is unexpectedly small    | Incorrect filter configuration                         | Review conversion settings                           |
+
+---
+
+## References
+
+ProteoWizard Documentation
+https://proteowizard.sourceforge.io/
+
+HUPO-PSI mzML Specification
+https://www.psidev.info/mzml
+
+---
+
+## Notes
+
+* Avoid folder names containing accented or special characters.
+* Keep the original RAW files unchanged.
+* Store mzML files in a separate directory from the raw data.
+* For Thermo, Waters, Agilent, and Bruker profile-mode data, vendor centroiding is generally recommended before downstream metabolomics processing.
+
+---
+
+## Revision History
+
+| Date       | Description     | Author       |
+| ---------- | --------------- | ------------ |
+| 2026-06-01 | Initial version | Tainá Schons |
