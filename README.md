@@ -1,7 +1,4 @@
-# omics-research-sops
-Standard Operating Procedures (SOPs) for metabolomics, proteomics, bioinformatics, statistics and evidence synthesis workflows.
 # Omics Research SOPs
-
 Open collection of Standard Operating Procedures (SOPs) for omics research workflows.
 
 ## Areas
