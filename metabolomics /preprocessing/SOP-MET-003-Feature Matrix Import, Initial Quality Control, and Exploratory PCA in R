@@ -1,0 +1,424 @@
+# SOP-MET-003
+
+## Feature Matrix Import, Initial Quality Control, and Exploratory PCA in R
+
+**Code:** SOP-MET-003
+**Area:** Metabolomics
+**Category:** Data Preprocessing
+**Application:** Untargeted LC–MS Metabolomics
+**Software:** R / RStudio
+**Status:** Active
+
+---
+
+# Objective
+
+This SOP describes the initial processing steps required after exporting feature tables from MZmine.
+
+The workflow includes:
+
+* Importing feature tables
+* Metadata alignment
+* Technical replicate collapsing
+* Initial quality control (QC)
+* Exploratory principal component analysis (PCA)
+* Preliminary identification of potential outliers
+
+The objective is to evaluate data quality before applying feature filtering, imputation, normalization, and downstream statistical analyses.
+
+---
+
+# Input Files
+
+### Feature Tables
+
+Exported from MZmine:
+
+```text
+featurelist_neg.csv
+featurelist_pos.csv
+```
+
+### Metadata
+
+```text
+metadata_batch1.xlsx
+```
+
+Required columns:
+
+```text
+sample_id
+filename
+sample_type
+group
+batch
+inj_order
+```
+
+---
+
+# Required Packages
+
+```r
+library(readr)
+library(readxl)
+library(dplyr)
+library(janitor)
+library(tibble)
+library(ggplot2)
+library(scales)
+```
+
+---
+
+# Part 1 – Feature Matrix Import and Metadata Alignment
+
+## Import MZmine Feature Tables
+
+```r
+feat_neg <- read_csv("featurelist_neg.csv") %>%
+  clean_names()
+
+feat_pos <- read_csv("featurelist_pos.csv") %>%
+  clean_names()
+```
+
+---
+
+## Extract Feature Information
+
+```r
+feature_neg_info <- feat_neg %>%
+  select(id, mz, rt, height)
+
+feature_pos_info <- feat_pos %>%
+  select(id, mz, rt, height)
+```
+
+These tables preserve feature metadata throughout filtering and statistical analysis.
+
+---
+
+## Extract Abundance Matrices
+
+Peak area is used as the abundance metric.
+
+```r
+mat_raw_neg <- feat_neg %>%
+  select(ends_with("_area"))
+
+mat_raw_pos <- feat_pos %>%
+  select(ends_with("_area"))
+```
+
+---
+
+## Harmonize Sample Names
+
+Convert MZmine-exported filenames into metadata-compatible filenames.
+
+```r
+colnames(mat_raw_neg) <- colnames(mat_raw_neg) %>%
+  gsub("^datafile_", "", .) %>%
+  gsub("_mz_ml_area$", ".mzML", .) %>%
+  tolower()
+
+colnames(mat_raw_pos) <- colnames(mat_raw_pos) %>%
+  gsub("^datafile_", "", .) %>%
+  gsub("_mz_ml_area$", ".mzML", .) %>%
+  tolower()
+```
+
+---
+
+## Import Metadata
+
+```r
+meta_neg <- read_excel(
+  "metadata_batch1.xlsx",
+  sheet = "neg"
+) %>%
+  clean_names() %>%
+  mutate(filename = tolower(filename))
+
+meta_pos <- read_excel(
+  "metadata_batch1.xlsx",
+  sheet = "pos"
+) %>%
+  clean_names() %>%
+  mutate(filename = tolower(filename))
+```
+
+---
+
+## Check Matrix–Metadata Consistency
+
+```r
+setdiff(colnames(mat_raw_neg), meta_neg$filename)
+setdiff(meta_neg$filename, colnames(mat_raw_neg))
+
+setdiff(colnames(mat_raw_pos), meta_pos$filename)
+setdiff(meta_pos$filename, colnames(mat_raw_pos))
+```
+
+Expected output:
+
+```r
+character(0)
+```
+
+---
+
+## Remove Metadata Entries Not Present in the Matrix
+
+```r
+meta_neg <- meta_neg %>%
+  filter(filename %in% colnames(mat_raw_neg))
+
+meta_pos <- meta_pos %>%
+  filter(filename %in% colnames(mat_raw_pos))
+```
+
+---
+
+## Reorder Matrices
+
+```r
+mat_raw_neg <- mat_raw_neg[
+  ,
+  meta_neg$filename,
+  drop = FALSE
+]
+
+mat_raw_pos <- mat_raw_pos[
+  ,
+  meta_pos$filename,
+  drop = FALSE
+]
+```
+
+---
+
+## Validate Alignment
+
+```r
+stopifnot(
+  all(colnames(mat_raw_neg) == meta_neg$filename)
+)
+
+stopifnot(
+  all(colnames(mat_raw_pos) == meta_pos$filename)
+)
+```
+
+---
+
+# Part 2 – Technical Replicate Collapsing (Positive Mode)
+
+Some positive-mode datasets may contain technical replicate injections.
+
+Biological samples are collapsed using the mean intensity across replicates, while blanks and QCs are retained individually.
+
+```r
+meta_pos <- meta_pos %>%
+  mutate(
+    collapse_id = if_else(
+      sample_type == "sample",
+      sample_id,
+      filename
+    )
+  )
+```
+
+Replicates are averaged at the feature level.
+
+The resulting objects are:
+
+```text
+mat_raw_pos_collapsed
+meta_pos_collapsed
+```
+
+---
+
+# Part 3 – Initial Quality Control
+
+## Calculate QC Metrics
+
+For each sample, calculate:
+
+* Missingness proportion
+* Total signal
+* Number of detected features
+
+```r
+missing_prop
+signal_total
+n_detected
+```
+
+These metrics are merged into the metadata table:
+
+```r
+meta_qc_neg
+meta_qc_pos
+```
+
+---
+
+## QC Inspection
+
+The following plots should be generated:
+
+### Detected Features by Sample Type
+
+```text
+sample vs QC vs blank
+```
+
+### Total Signal by Sample Type
+
+```text
+sample vs QC vs blank
+```
+
+### Total Signal Across Injection Order
+
+```text
+signal drift assessment
+```
+
+### Missingness per Sample
+
+```text
+sample-level missing values
+```
+
+### Total Signal per Sample
+
+```text
+sample-level signal inspection
+```
+
+### QC Stability Plot
+
+```text
+QC signal across analytical run
+```
+
+---
+
+# Part 4 – Exploratory PCA
+
+## Missing Value Imputation
+
+Prior to PCA, missing values are replaced by half of the smallest positive value observed for each feature.
+
+```r
+missing_value = min_positive / 2
+```
+
+---
+
+## Log Transformation
+
+```r
+log10(x + 1)
+```
+
+is applied to stabilize variance.
+
+---
+
+## Principal Component Analysis
+
+```r
+pca <- prcomp(
+  t(mat_log),
+  scale. = TRUE
+)
+```
+
+Variance explained is calculated for each principal component.
+
+---
+
+## PCA Visualizations
+
+The following plots should be generated:
+
+### Initial PCA
+
+```text
+All samples
+```
+
+### PCA Without Blanks
+
+```text
+Biological samples + QCs
+```
+
+### QC Clustering PCA
+
+```text
+QCs versus biological samples
+```
+
+---
+
+# Outlier Assessment
+
+The PCA generated in this SOP is exploratory.
+
+Potential outliers may be visualized separately to facilitate interpretation of the overall dataset structure.
+
+Outliers should not be automatically removed at this stage.
+
+Sample exclusion should only be considered after subsequent filtering steps and careful evaluation of:
+
+* QC metrics
+* PCA behavior after filtering
+* Experimental records
+* Instrumental performance
+
+---
+
+# Output Files
+
+### Negative Mode
+
+```text
+mat_raw_neg.rds
+meta_neg.rds
+feature_neg_info.rds
+meta_qc_neg.rds
+neg_qc_metrics.tsv
+```
+
+### Positive Mode
+
+```text
+mat_raw_pos.rds
+meta_pos.rds
+feature_pos_info.rds
+meta_qc_pos.rds
+pos_qc_metrics.tsv
+```
+
+---
+
+# References
+
+1. Schmid R, Heuckeroth S, Korf A, Smirnov A, Myers O, et al. Integrative analysis of multimodal mass spectrometry data in MZmine 3. Nature Biotechnology. 2023;41:447–449.
+
+2. Pluskal T, Korf A, Smirnov A, Schmid R, Fallon TR, Du X, et al. Metabolomics Data Analysis Using MZmine. Royal Society of Chemistry. 2020.
+
+3. Karaman I, Climaco Pinto R, Graça G. Metabolomics Data Preprocessing: From Raw Data to Features for Statistical Analysis. Comprehensive Analytical Chemistry. 2018.
+
+---
+
+# Notes
+
+The thresholds, QC criteria, imputation strategy, and exploratory PCA procedures described in this SOP reflect the analytical workflow adopted in our laboratory and may be adjusted according to study design, instrument platform, QC performance, and biological objectives.
