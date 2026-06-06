@@ -1,4 +1,4 @@
-# POP-MET-002
+# SOP-MET-002
 
 Title: Untargeted LC-MS Data Processing Using MZmine 4
 
