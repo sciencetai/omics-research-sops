@@ -1,0 +1,564 @@
+# SOP-MET-004
+
+## Feature Filtering, Quality Control and Normalization of Untargeted LC-MS Data
+
+### Overview
+
+This SOP describes the filtering and normalization workflow applied after data import and initial quality control (SOP-MET-003).
+
+The workflow includes:
+
+* blank filtering;
+* QC stability filtering;
+* feature filtering summary;
+* missing value imputation;
+* total signal normalization;
+* log transformation;
+* PCA before and after normalization;
+* export of the final analysis matrix.
+
+The objective is to reduce analytical noise, remove unstable features and prepare the dataset for downstream statistical analyses.
+
+---
+
+## Requirements
+
+### Software
+
+* R (recommended ≥ 4.3)
+* RStudio
+
+### Packages
+
+```r
+library(tidyverse)
+library(janitor)
+library(ggplot2)
+library(scales)
+library(tibble)
+library(readr)
+```
+
+Create an output directory:
+
+```r
+dir.create("02_Filtering", showWarnings = FALSE)
+```
+
+---
+
+## Input Files
+
+This SOP assumes that SOP-MET-003 has already been completed.
+
+### Negative Mode
+
+```r
+mat_raw_neg
+meta_qc_neg
+feature_neg_info
+```
+
+### Positive Mode
+
+```r
+mat_raw_pos
+meta_qc_pos
+feature_pos_info
+```
+
+---
+
+## Step 1 – Define Input Data
+
+For negative mode:
+
+```r
+mat <- mat_raw_neg
+meta <- meta_qc_neg
+feature_info <- feature_neg_info
+mode <- "neg"
+```
+
+For positive mode:
+
+```r
+mat <- mat_raw_pos
+meta <- meta_qc_pos
+feature_info <- feature_pos_info
+mode <- "pos"
+```
+
+Standardize filenames and align metadata with the feature matrix.
+
+```r
+colnames(mat) <- tolower(colnames(mat))
+meta$filename <- tolower(meta$filename)
+
+mat <- mat[, meta$filename, drop = FALSE]
+
+stopifnot(all(colnames(mat) == meta$filename))
+```
+
+Ensure all matrix values are numeric.
+
+```r
+mat <- mat %>%
+  mutate(across(everything(), as.numeric)) %>%
+  as.data.frame()
+```
+
+---
+
+## Step 2 – Separate Sample Types
+
+Identify biological samples, pooled quality controls (QCs), and analytical blanks.
+
+```r
+sample_ids <- meta %>%
+  filter(sample_type == "sample") %>%
+  pull(filename)
+
+qc_ids <- meta %>%
+  filter(sample_type == "qc") %>%
+  pull(filename)
+
+blank_ids <- meta %>%
+  filter(sample_type == "blank") %>%
+  pull(filename)
+```
+
+---
+
+## Step 3 – Blank Filtering
+
+### Purpose
+
+Remove features originating from solvents, mobile phase, extraction artifacts, column bleed, laboratory contamination or instrumental background.
+
+### Procedure
+
+Calculate the mean intensity of each feature across biological samples and blanks.
+
+```r
+mean_sample <- rowMeans(mat[, sample_ids, drop = FALSE], na.rm = TRUE)
+mean_blank  <- rowMeans(mat[, blank_ids, drop = FALSE], na.rm = TRUE)
+
+mean_sample[is.nan(mean_sample)] <- 0
+mean_blank[is.nan(mean_blank)] <- 0
+```
+
+Calculate the sample-to-blank ratio:
+
+```r
+blank_ratio <- mean_sample / (mean_blank + 1)
+```
+
+The `+1` prevents division by zero when the blank signal is absent.
+
+Generate the filtering table:
+
+```r
+filter_blank_df <- tibble(
+  feature_index = seq_len(nrow(mat)),
+  feature_id = feature_info$id,
+  mz = feature_info$mz,
+  rt = feature_info$rt,
+  mean_sample = mean_sample,
+  mean_blank = mean_blank,
+  blank_ratio = blank_ratio,
+  keep_blank = blank_ratio > 5
+)
+```
+
+### Criterion
+
+Retain features when:
+
+```text
+Sample/Blank Ratio > 5
+```
+
+---
+
+## Step 4 – QC Stability Filtering
+
+### Purpose
+
+Remove analytically unstable features.
+
+### Procedure
+
+Calculate mean intensity, standard deviation and relative standard deviation (RSD) across pooled QC samples.
+
+```r
+qc_mean <- rowMeans(mat[, qc_ids, drop = FALSE], na.rm = TRUE)
+
+qc_sd <- apply(
+  mat[, qc_ids, drop = FALSE],
+  1,
+  sd,
+  na.rm = TRUE
+)
+
+qc_mean[is.nan(qc_mean)] <- 0
+qc_sd[is.nan(qc_sd)] <- 0
+
+qc_rsd <- 100 * qc_sd / qc_mean
+
+qc_rsd[!is.finite(qc_rsd)] <- Inf
+```
+
+Generate the QC filtering table:
+
+```r
+filter_qc_df <- tibble(
+  feature_index = seq_len(nrow(mat)),
+  qc_mean = qc_mean,
+  qc_sd = qc_sd,
+  qc_rsd = qc_rsd,
+  keep_qc = qc_rsd < 30
+)
+```
+
+### Criterion
+
+Retain features when:
+
+```text
+QC RSD < 30%
+```
+
+---
+
+## Step 5 – Combine Filters
+
+A feature is retained only when it passes both filtering criteria.
+
+```text
+Sample/Blank Ratio > 5
+AND
+QC RSD < 30%
+```
+
+```r
+feature_filter_df <- filter_blank_df %>%
+  left_join(filter_qc_df, by = "feature_index") %>%
+  mutate(
+    keep_final = keep_blank & keep_qc
+  )
+```
+
+Generate the filtered matrix:
+
+```r
+mat_filt <- mat[
+  feature_filter_df$keep_final,
+  ,
+  drop = FALSE
+]
+
+feature_filt <- feature_info[
+  feature_filter_df$keep_final,
+]
+```
+
+---
+
+## Step 6 – Filter Summary
+
+Summarize the number of retained features after each filtering step.
+
+```r
+filter_summary <- tibble(
+  step = c(
+    "Initial features",
+    "After blank filter",
+    "After QC RSD filter",
+    "After combined filters"
+  ),
+  n_features = c(
+    nrow(mat),
+    sum(feature_filter_df$keep_blank),
+    sum(feature_filter_df$keep_qc),
+    sum(feature_filter_df$keep_final)
+  )
+)
+```
+
+### Example Results
+
+#### Negative Mode
+
+```text
+Initial features:         34,611
+After blank filter:       31,221
+After QC RSD filter:       3,057
+After combined filters:    2,100
+```
+
+#### Positive Mode
+
+```text
+Initial features:         15,083
+After blank filter:       14,172
+After QC RSD filter:       1,293
+After combined filters:    1,090
+```
+
+---
+
+## Step 7 – Save Filtering Results
+
+```r
+write_tsv(
+  feature_filter_df,
+  paste0("02_Filtering/", mode, "_feature_filter_summary.tsv")
+)
+
+write_tsv(
+  filter_summary,
+  paste0("02_Filtering/", mode, "_filter_counts.tsv")
+)
+
+saveRDS(
+  mat_filt,
+  paste0("02_Filtering/mat_", mode, "_blank_qc_filtered.rds")
+)
+
+saveRDS(
+  feature_filt,
+  paste0("02_Filtering/feature_", mode, "_blank_qc_filtered.rds")
+)
+```
+
+---
+
+## Step 8 – Evaluate Feature Retention
+
+Visualize the number of features before and after filtering.
+
+```r
+filter_summary_plot <- tibble(
+  step = c(
+    "Before filtering",
+    "After filtering"
+  ),
+  n_features = c(
+    nrow(mat),
+    nrow(mat_filt)
+  )
+)
+```
+
+Generate a bar plot to document the filtering impact.
+
+---
+
+## Step 9 – Prepare Data for Normalization
+
+Remove analytical blanks and retain only biological samples and QCs.
+
+```r
+analysis_ids <- c(sample_ids, qc_ids)
+
+meta_analysis <- meta %>%
+  filter(filename %in% analysis_ids) %>%
+  arrange(match(filename, analysis_ids))
+
+mat_before <- mat_filt[
+  ,
+  analysis_ids,
+  drop = FALSE
+]
+```
+
+---
+
+## Step 10 – Missing Value Imputation
+
+### Purpose
+
+Allow log transformation and multivariate analyses.
+
+### Procedure
+
+Missing values are replaced by half of the minimum positive value observed for each feature.
+
+```r
+impute_halfmin <- function(x) {
+
+  min_pos <- suppressWarnings(
+    min(x[x > 0], na.rm = TRUE)
+  )
+
+  if (!is.finite(min_pos))
+    min_pos <- 1
+
+  x[is.na(x)] <- min_pos / 2
+
+  x
+}
+```
+
+Apply the function across all features.
+
+### Note
+
+Half-min imputation is used here as a simple exploratory strategy and may be replaced by alternative methods depending on study objectives.
+
+---
+
+## Step 11 – Total Signal Normalization
+
+### Purpose
+
+Reduce global intensity differences among samples.
+
+### Procedure
+
+Normalize each sample by its total signal.
+
+```r
+mat_norm_linear <- sweep(
+  mat_before_imp,
+  2,
+  colSums(mat_before_imp),
+  FUN = "/"
+)
+```
+
+---
+
+## Step 12 – Log Transformation
+
+Apply log transformation:
+
+```r
+mat_norm <- log10(
+  mat_norm_linear + 1e-6
+)
+```
+
+### Purpose
+
+* reduce skewness;
+* reduce heteroscedasticity;
+* decrease the influence of extreme values;
+* improve multivariate modeling.
+
+---
+
+## Step 13 – Evaluate Total Signal Before and After Normalization
+
+Compare the total signal distribution before and after normalization.
+
+Generate boxplots separated by sample type.
+
+Expected outcome:
+
+* reduced signal variability;
+* comparable signal scale among samples;
+* improved consistency between biological samples and QCs.
+
+---
+
+## Step 14 – PCA Before Normalization
+
+Perform PCA using the imputed matrix.
+
+```r
+pca_before <- prcomp(
+  t(log10(mat_before_imp + 1)),
+  scale. = TRUE
+)
+```
+
+### Purpose
+
+* identify outliers;
+* assess QC clustering;
+* inspect analytical variability;
+* evaluate baseline data structure.
+
+---
+
+## Step 15 – PCA After Normalization
+
+Perform PCA using the normalized matrix.
+
+```r
+pca_after <- prcomp(
+  t(mat_norm),
+  scale. = TRUE
+)
+```
+
+### Purpose
+
+* verify preservation of biological structure;
+* assess improvement in QC clustering;
+* confirm reduction of technical variability.
+
+---
+
+## Step 16 – Export Final Matrix
+
+Export the final filtered and normalized matrix.
+
+```r
+write_tsv(
+  mat_final_out,
+  paste0(
+    "02_Filtering/",
+    mode,
+    "_matrix_filtered_normalized.tsv"
+  )
+)
+
+write_tsv(
+  meta_analysis,
+  paste0(
+    "02_Filtering/",
+    mode,
+    "_metadata_analysis.tsv"
+  )
+)
+
+saveRDS(
+  mat_final,
+  paste0(
+    "02_Filtering/mat_final_",
+    mode,
+    ".rds"
+  )
+)
+```
+
+---
+
+## Parameter Justification
+
+| Parameter                | Value                         |
+| ------------------------ | ----------------------------- |
+| Sample/Blank Ratio       | > 5                           |
+| QC RSD                   | < 30%                         |
+| Missing Value Imputation | Half-min                      |
+| Normalization            | Total Signal Normalization    |
+| Transformation           | log10(x + 1e-6)               |
+| QC Type                  | Pooled QC                     |
+| PCA Scaling              | Unit Variance (`scale.=TRUE`) |
+
+These parameters were selected based on common practices in untargeted LC-MS metabolomics and the recommendations discussed during metabolomics training and coursework.
+
+---
+
+## References
+
+Broadhurst D, Goodacre R, Reinke SN, et al. Guidelines and considerations for the use of system suitability and quality control samples in mass spectrometry assays applied in untargeted clinical metabolomic studies. *Metabolomics*. 2018;14(6):72.
+
+Dunn WB, Broadhurst D, Begley P, et al. Procedures for large-scale metabolic profiling of serum and plasma using gas chromatography and liquid chromatography coupled to mass spectrometry. *Nature Protocols*. 2011;6(7):1060–1083.
+
+Want EJ, Wilson ID, Gika H, et al. Global metabolic profiling procedures for urine using UPLC-MS. *Nature Protocols*. 2010;5(6):1005–1018.
+
+Bijlsma S, Bobeldijk I, Verheij ER, et al. Large-scale human metabolomics studies: a strategy for data pre-processing and validation. *Analytical Chemistry*. 2006;78(2):567–574.
