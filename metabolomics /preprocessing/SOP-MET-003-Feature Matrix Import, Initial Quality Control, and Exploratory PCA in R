@@ -354,6 +354,38 @@ The following plots should be generated:
 All samples
 ```
 
+### PCA Colored by Biological Groups, QCs, and Blanks
+
+In addition to PCA visualizations based on sample type, it is recommended to generate a PCA simultaneously highlighting biological groups, quality control samples (QCs), and analytical blanks.
+
+This visualization allows assessment of:
+
+- QC clustering;
+- separation between blanks and biological samples;
+- preliminary biological trends among experimental groups;
+- potential outliers or unexpected sample behavior.
+
+```r
+pca_neg_df <- pca_neg_df %>%
+  mutate(
+    plot_group = case_when(
+      sample_type == "blank" ~ "Blank",
+      sample_type == "qc" ~ "QC",
+      TRUE ~ group
+    )
+  )
+
+ggplot(
+  pca_neg_df,
+  aes(
+    PC1,
+    PC2,
+    color = plot_group
+  )
+) +
+  geom_point(size = 3) +
+  theme_bw()
+
 ### PCA Without Blanks
 
 ```text
